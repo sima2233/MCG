@@ -1,134 +1,219 @@
+import javax.swing.*;
+import java.awt.*;
+import java.util.Arrays;
 import java.util.Random;
-import java.util.Scanner;
 
-public class Main {
-    static Scanner input = new Scanner(System.in);
-    static Random rand = new Random();
+public class Main extends JFrame {
+    private JLabel questionLabel, scoreLabel, timerLabel, feedbackLabel;
+    private JTextField answerField, nameField;
+    private JButton submitButton, startButton, instructionsButton;
+    private JComboBox<String> difficultyBox;
 
-    public static void main(String[] args) {
-        while (true) {
-            // Main Menu
-            System.out.println("====== Math Challenge Game ======");
-            System.out.println("1. Start Game");
-            System.out.println("2. Instructions");
-            System.out.println("3. Exit");
-            System.out.print("Enter choice: ");
+    private double score = 0;   // now a double
+    private int correctAnswer;
+    private int timeLeft = 60;
+    private Timer timer;
+    private Random rand = new Random();
 
-            int choice = input.nextInt();
+    // Arrays for leaderboard (store last 5 games)
+    private double[] leaderboard = new double[5];
+    private String[] playerNames = new String[5];
+    private int gameCount = 0;
 
-            switch (choice) {
-                case 1:
-                    startGame();
-                    break;
-                case 2:
-                    showInstructions();
-                    break;
-                case 3:
-                    System.out.println("Exiting game. Goodbye!");
-                    return; // exit program
-                default:
-                    System.out.println("Invalid choice. Try again.");
-            }
+    private String currentPlayer = "Player";
+
+    public Main() {
+        setTitle("Math Challenge Game");
+        setSize(450, 550);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLayout(new GridLayout(11, 1));
+
+        // UI components
+        questionLabel = new JLabel("Enter your name, choose difficulty, and click Start", SwingConstants.CENTER);
+        scoreLabel = new JLabel("Score: 0", SwingConstants.CENTER);
+        timerLabel = new JLabel("Time: 60", SwingConstants.CENTER);
+        feedbackLabel = new JLabel("Previous Answer: ---", SwingConstants.CENTER);
+
+        nameField = new JTextField("Player1");
+        answerField = new JTextField();
+
+        submitButton = new JButton("Submit");
+        startButton = new JButton("Start Game");
+        instructionsButton = new JButton("Instructions");
+
+        // Difficulty dropdown
+        String[] difficulties = {"Easy", "Medium", "Hard"};
+        difficultyBox = new JComboBox<>(difficulties);
+
+        // Add components
+        add(new JLabel("Enter Your Name:", SwingConstants.CENTER));
+        add(nameField);
+        add(questionLabel);
+        add(scoreLabel);
+        add(timerLabel);
+        add(difficultyBox);
+        add(answerField);
+        add(submitButton);
+        add(startButton);
+        add(instructionsButton);
+        add(feedbackLabel);
+
+        // Event listeners
+        submitButton.addActionListener(e -> checkAnswer());
+        startButton.addActionListener(e -> startGame());
+        instructionsButton.addActionListener(e -> showInstructions());
+
+        // Allow pressing Enter in the answer field
+        answerField.addActionListener(e -> checkAnswer());
+
+        setVisible(true);
+    }
+
+    private void showInstructions() {
+        JOptionPane.showMessageDialog(this,
+                "--- Instructions ---\n"
+                        + "1. Choose your name and difficulty before starting.\n"
+                        + "2. Solve as many math problems as possible in 60 seconds.\n"
+                        + "3. Easy: +, - (0.5 points each).\n"
+                        + "4. Medium: ×, ÷ (whole numbers only, 2 points each).\n"
+                        + "5. Hard: +, -, ×, ÷ (whole numbers only, 3 points each).\n"
+                        + "Leaderboard will show the top 5 scores.");
+    }
+
+    private void startGame() {
+        currentPlayer = nameField.getText().trim();
+        if (currentPlayer.isEmpty()) {
+            currentPlayer = "Player" + (gameCount + 1);
         }
-    }
 
-    public static void showInstructions() {
-        System.out.println("\n--- Instructions ---");
-        System.out.println("Solve as many math problems as you can within 60 seconds.");
-        System.out.println("Choose a difficulty level: Easy, Medium, or Hard.");
-        System.out.println("Each correct answer = 1 point.\n");
-    }
+        score = 0;
+        timeLeft = 60;
+        scoreLabel.setText("Score: 0");
+        timerLabel.setText("Time: " + timeLeft);
+        feedbackLabel.setText("Previous Answer: ---");
+        nextQuestion();
 
-    public static void startGame() {
-        //Prompts user to choose their difficulty
-        System.out.println("\nSelect Difficulty:");
-        System.out.println("1. Easy");
-        System.out.println("2. Medium");
-        System.out.println("3. Hard");
-        System.out.print("Enter difficulty: ");
-        int difficulty = input.nextInt();
+        // Disable Start while playing
+        startButton.setEnabled(false);
 
-        //initializes Score and startTime
-        int score = 0;
-        long startTime = System.currentTimeMillis();
-        int timeLimit = 60; // 60 seconds
-
-        while ((System.currentTimeMillis() - startTime) / 1000 < timeLimit) {
-            String question = generateQuestion(difficulty);
-            int correctAnswer = evaluateQuestion(question);
-
-            System.out.println("Solve: " + question);
-            System.out.print("Your answer: ");
-
-            if (input.hasNextInt()) {
-                int playerAnswer = input.nextInt();
-                if (playerAnswer == correctAnswer) {
-                    System.out.println("Correct!\n");
-                    score++;
-                } else {
-                    System.out.println("Wrong! The correct answer was: " + correctAnswer + "\n");
-                }
-            } else {
-                System.out.println("Invalid input! Numbers only.\n");
-                input.next(); // clear invalid input
+        // Timer counts down every second
+        timer = new Timer(1000, e -> {
+            timeLeft--;
+            timerLabel.setText("Time: " + timeLeft);
+            if (timeLeft <= 0) {
+                ((Timer) e.getSource()).stop();
+                endGame();
             }
-        }
-
-        System.out.println("\nTime's up! Your final score is: " + score + "\n");
+        });
+        timer.start();
     }
 
-    public static String generateQuestion(int difficulty) {
+    private void nextQuestion() {
         int num1, num2;
         char operator;
 
-        switch (difficulty) {
-            case 1: // Easy
-                num1 = rand.nextInt(10) + 1;
-                num2 = rand.nextInt(10) + 1;
-                operator = rand.nextBoolean() ? '+' : '-';
-                break;
-            case 2: // Medium
-                num1 = rand.nextInt(20) + 1;
-                char[] opsMedium = {'*', '/'}; // Only multiplication and division
-                operator = opsMedium[rand.nextInt(opsMedium.length)];
-                if (operator == '/') {
-                    num2 = rand.nextInt(19) + 2; // Avoids division by 1, which isn't challenging
-                    num1 = num2 * (rand.nextInt(10) + 1); // Ensures num1 is a multiple of num2
-                } else {
-                    num2 = rand.nextInt(20) + 1;
-                }
-                break;
-            case 3: // Hard
-                char[] opsHard = {'+', '-', '*', '/'}; // All operators
-                operator = opsHard[rand.nextInt(opsHard.length)];
-                if (operator == '/') {
-                    num2 = rand.nextInt(49) + 2; // Avoids division by 1
-                    num1 = num2 * (rand.nextInt(25) + 1); // Ensures num1 is a multiple of num2
-                } else {
-                    num1 = rand.nextInt(50) + 1;
-                    num2 = rand.nextInt(50) + 1;
-                }
-                break;
-            default:
-                num1 = 1;
-                num2 = 1;
-                operator = '+';
+        String difficulty = (String) difficultyBox.getSelectedItem();
+
+        if (difficulty.equals("Easy")) {
+            num1 = rand.nextInt(10) + 1;
+            num2 = rand.nextInt(10) + 1;
+            operator = rand.nextBoolean() ? '+' : '-';
+        } else if (difficulty.equals("Medium")) {
+            num1 = rand.nextInt(20) + 1;
+            num2 = rand.nextInt(20) + 1;
+            operator = rand.nextBoolean() ? '*' : '/';
+            if (operator == '/') {
+                num2 = rand.nextInt(19) + 1; // ensure num2 > 0
+                num1 = num2 * (rand.nextInt(10) + 1); // make divisible
+            }
+        } else { // Hard
+            num1 = rand.nextInt(50) + 1;
+            num2 = rand.nextInt(50) + 1;
+            char[] ops = {'+', '-', '*', '/'};
+            operator = ops[rand.nextInt(ops.length)];
+            if (operator == '/') {
+                num2 = rand.nextInt(49) + 1;
+                num1 = num2 * (rand.nextInt(10) + 1); // make divisible
+            }
         }
-        return num1 + " " + operator + " " + num2;
+
+        // Calculate correct answer
+        switch (operator) {
+            case '+': correctAnswer = num1 + num2; break;
+            case '-': correctAnswer = num1 - num2; break;
+            case '*': correctAnswer = num1 * num2; break;
+            case '/': correctAnswer = num1 / num2; break;
+            default: correctAnswer = 0;
+        }
+
+        questionLabel.setText(num1 + " " + operator + " " + num2 + " = ?");
+        answerField.setText("");
     }
 
-    public static int evaluateQuestion(String question) {
-        String[] parts = question.split(" ");
-        int num1 = Integer.parseInt(parts[0]);
-        char operator = parts[1].charAt(0);
-        int num2 = Integer.parseInt(parts[2]);
+    private void checkAnswer() {
+        try {
+            int playerAnswer = Integer.parseInt(answerField.getText());
+            String difficulty = (String) difficultyBox.getSelectedItem();
 
-        switch (operator) {
-            case '+': return num1 + num2;
-            case '-': return num1 - num2;
-            case '*': return num1 * num2;
-            case '/': return num1 / num2; // integer division
-            default: return 0;
+            if (playerAnswer == correctAnswer) {
+                double points = 0.5;
+                if (difficulty.equals("Medium")) points = 2;
+                if (difficulty.equals("Hard")) points = 3;
+
+                score += points;
+                scoreLabel.setText("Score: " + String.format("%.1f", score));
+                feedbackLabel.setText("Previous Answer: ✅ Correct! (+" + points + " points)");
+            } else {
+                feedbackLabel.setText("Previous Answer: ❌ Wrong! Correct was " + correctAnswer);
+            }
+            nextQuestion();
+        } catch (NumberFormatException ex) {
+            feedbackLabel.setText("Previous Answer: ⚠ Invalid input!");
         }
+    }
+
+    private void endGame() {
+        feedbackLabel.setText("Game Over! Final Score: " + String.format("%.1f", score));
+
+        // Save score in leaderboard (last 5 games)
+        leaderboard[gameCount % leaderboard.length] = score;
+        playerNames[gameCount % playerNames.length] = currentPlayer;
+        gameCount++;
+
+        // Copy arrays to sort them
+        double[] scoresCopy = Arrays.copyOf(leaderboard, leaderboard.length);
+        String[] namesCopy = Arrays.copyOf(playerNames, playerNames.length);
+
+        // Bubble sort descending
+        for (int i = 0; i < scoresCopy.length - 1; i++) {
+            for (int j = 0; j < scoresCopy.length - i - 1; j++) {
+                if (scoresCopy[j] < scoresCopy[j + 1]) {
+                    double tempScore = scoresCopy[j];
+                    scoresCopy[j] = scoresCopy[j + 1];
+                    scoresCopy[j + 1] = tempScore;
+
+                    String tempName = namesCopy[j];
+                    namesCopy[j] = namesCopy[j + 1];
+                    namesCopy[j + 1] = tempName;
+                }
+            }
+        }
+
+        // Build leaderboard
+        StringBuilder lb = new StringBuilder("--- Leaderboard (Top 5) ---\n");
+        for (int i = 0; i < scoresCopy.length; i++) {
+            if (scoresCopy[i] > 0 && namesCopy[i] != null) {
+                lb.append(namesCopy[i]).append(" - ").append(String.format("%.1f", scoresCopy[i])).append("\n");
+            }
+        }
+
+        JOptionPane.showMessageDialog(this, lb.toString());
+
+        // Re-enable Start button
+        startButton.setEnabled(true);
+    }
+
+    public static void main(String[] args) {
+        new Main();
     }
 }
